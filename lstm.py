@@ -1,18 +1,50 @@
 import tensorflow as tf
 
 
+def get_batch(fn_queue, num_steps, batch_size):
+    reader = tf.TFRecordReader()
+    _, serialized = reader.read(fn_queue)
+
+    context_features = {
+        'label': tf.FixedLenFeature([], dtype=tf.int64),
+        'length': tf.FixedLenFeature([], dtype=tf.int64),
+        'weight': tf.FixedLenFeature([], dtype=tf.int64),
+    }
+    sequence_features = {
+        'tokens': tf.FixedLenSequenceFeature([], dtype=tf.int64)
+    }
+
+    context, sequence = tf.parse_single_sequence_example(
+        serialized,
+        context_features=context_features,
+        sequence_features=sequence_features)
+
+    example = {}
+    example.update(context)
+    example.update(sequence)
+
+    batch = tf.train.batch(
+        example, batch_size,
+        allow_smaller_final_batch=True,
+        shapes=[(), (), (num_steps), ()])
+    return batch
+
+
 class LSTM(object):
     def __init__(self,
-                 batch,
+                 fn_queue,
                  num_units,
                  num_layers,
                  num_steps,
                  num_labels,
                  emb_size,
                  vocab_size,
+                 batch_size,
                  learning_rate,
                  max_clip_norm,
                  dtype=tf.float32):
+
+        batch = get_batch(fn_queue, num_steps, batch_size)
 
         self.label = batch['label']
         self.tokens = batch['tokens']

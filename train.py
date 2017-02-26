@@ -20,20 +20,20 @@ tf.app.flags.DEFINE_integer('vocab_size', 1000, 'Size of vocabulary.')
 tf.app.flags.DEFINE_float('learning_rate', .005, 'Learning rate.')
 tf.app.flags.DEFINE_float('max_clip_norm', 5.0, 'Clip norm for gradients.')
 tf.app.flags.DEFINE_bool('use_fp16', False, 'Use tf.float16.')
-tf.app.flags.DEFINE_bool('do_label', False, 'Train model or label sequence.')
 
 FLAGS = tf.app.flags.FLAGS
 
 
-def create_model(session, batch):
+def create_model(session, fn_queue):
     model = LSTM(
-        batch,
+        fn_queue,
         FLAGS.num_units,
         FLAGS.num_layers,
         FLAGS.num_steps,
         FLAGS.num_labels,
         FLAGS.emb_size,
         FLAGS.vocab_size,
+        FLAGS.batch_size,
         FLAGS.learning_rate,
         FLAGS.max_clip_norm,
         tf.float16 if FLAGS.use_fp16 else tf.float32)
@@ -42,6 +42,7 @@ def create_model(session, batch):
     if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
         print('Restoring model from %s.' % ckpt.model_checkpoint_path)
         model.saver.restore(session, ckpt.model_checkpoint_path)
+        session.run(tf.local_variables_initializer())
     else:
         print('Created model with fresh parameters.')
         session.run(tf.local_variables_initializer())
@@ -56,36 +57,10 @@ def train():
             train_files.append(os.path.join(FLAGS.data_dir, f))
 
     fn_queue = tf.train.string_input_producer(
-        train_files, num_epochs=FLAGS.num_epochs)
-
-    reader = tf.TFRecordReader()
-    _, serialized = reader.read(fn_queue)
-
-    context_features = {
-        'label': tf.FixedLenFeature([], dtype=tf.int64),
-        'length': tf.FixedLenFeature([], dtype=tf.int64),
-        'weight': tf.FixedLenFeature([], dtype=tf.int64),
-    }
-    sequence_features = {
-        'tokens': tf.FixedLenSequenceFeature([], dtype=tf.int64)
-    }
-
-    context, sequence = tf.parse_single_sequence_example(
-        serialized,
-        context_features=context_features,
-        sequence_features=sequence_features)
-
-    example = {}
-    example.update(context)
-    example.update(sequence)
-
-    batch = tf.train.batch(
-        example, FLAGS.batch_size,
-        allow_smaller_final_batch=True,
-        shapes=[(), (), (FLAGS.num_steps), ()])
+        string_tensor=train_files, num_epochs=FLAGS.num_epochs)
 
     with tf.Session() as sess:
-        model = create_model(sess, batch)
+        model = create_model(sess, fn_queue)
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
@@ -114,7 +89,4 @@ def train():
 
 
 if __name__ == '__main__':
-    if FLAGS.do_label:
-        pass
-    else:
-        train()
+    train()
