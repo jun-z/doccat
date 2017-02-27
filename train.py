@@ -43,11 +43,13 @@ def create_model(session, fn_queue):
         print('Restoring model from %s.' % ckpt.model_checkpoint_path)
         model.saver.restore(session, ckpt.model_checkpoint_path)
         session.run(tf.local_variables_initializer())
+        step = int(ckpt.model_checkpoint_path.split('/')[-1].split('-')[-1])
     else:
         print('Created model with fresh parameters.')
         session.run(tf.local_variables_initializer())
         session.run(tf.global_variables_initializer())
-    return model
+        step = 0
+    return step, model
 
 
 def train():
@@ -60,12 +62,11 @@ def train():
         string_tensor=train_files, num_epochs=FLAGS.num_epochs)
 
     with tf.Session() as sess:
-        model = create_model(sess, fn_queue)
+        step, model = create_model(sess, fn_queue)
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
         try:
-            step = 0
             while not coord.should_stop():
                 start = time.time()
                 _, loss = sess.run([model.train, model.loss])
@@ -83,6 +84,11 @@ def train():
             print('Done training for %d epochs, %d steps.' %
                   (FLAGS.num_epochs, step))
         finally:
+            model.saver.save(
+                sess,
+                os.path.join(FLAGS.train_dir, 'doccat.ckpt'),
+                global_step=step)
+
             coord.request_stop()
 
         coord.join(threads)
