@@ -60,7 +60,7 @@ class LSTM(object):
         if num_layers > 1:
             cell = tf.nn.rnn_cell.MultiRNNCell([cell] * num_layers)
 
-        outputs, _ = tf.nn.rnn(
+        _, state = tf.nn.rnn(
             cell=cell,
             inputs=tf.unstack(inp_emb, axis=1),
             dtype=dtype,
@@ -73,7 +73,7 @@ class LSTM(object):
             'b', [num_labels], dtype=dtype,
             initializer=tf.constant_initializer(.1))
 
-        logits = tf.matmul(outputs[-1], W) + b
+        logits = tf.matmul(state[1], W) + b
         targets = tf.one_hot(self.label, num_labels, dtype=dtype)
 
         xentropy = tf.nn.softmax_cross_entropy_with_logits(logits, targets)

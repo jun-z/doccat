@@ -22,7 +22,7 @@ def _eval():
         string_tensor=eval_files, num_epochs=1)
 
     with tf.Session() as sess:
-        model = create_model(sess, fn_queue)
+        _, model = create_model(sess, fn_queue)
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
