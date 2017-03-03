@@ -51,10 +51,11 @@ class LSTM(object):
         self.length = batch['length']
         self.weight = tf.cast(batch['weight'], dtype)
 
-        embedding = tf.get_variable(
-            'embedding', [vocab_size, emb_size], dtype=dtype)
+        with tf.device('/cpu:0'):
+            embedding = tf.get_variable(
+                'embedding', [vocab_size, emb_size], dtype=dtype)
 
-        inp_emb = tf.nn.embedding_lookup(embedding, self.tokens)
+            inp_emb = tf.nn.embedding_lookup(embedding, self.tokens)
 
         cell = tf.nn.rnn_cell.BasicLSTMCell(num_units)
         if num_layers > 1:
