@@ -67,6 +67,9 @@ class LSTM(object):
             dtype=dtype,
             sequence_length=self.length)
 
+        if num_layers > 1:
+            state = state[-1]
+
         W = tf.get_variable(
             'W', [num_units, num_labels], dtype=dtype,
             initializer=tf.truncated_normal_initializer(stddev=.01))
